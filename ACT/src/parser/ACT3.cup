@@ -1,0 +1,169 @@
+package parser;			//
+import java_cup.runtime.*;
+
+import graph.BinaryOperation;
+import graph.Operation;
+import graph.Guard;
+import graph.ActionClass;
+import graph.Collection;
+import graph.State;
+import graph.INode;
+import graph.IEdge;
+import graph.StateChart;
+import graph.Transition;
+import graph.FrontEnd;
+
+parser code {:
+	public static void main(String args[]) throws Exception {
+		new parser(new Yylex(System.in)).parse();
+	}
+:}
+
+terminal LBRACE,RBRACE,COLON,COMMA,EQUAL,SYSTEM,STATE,DESC,INPUT,CLICKABLE,TRANSITION,SOURCE,DEST,TRIGGER,GUARD,ACTI,DOT,SAVE,openBracket,closeBracket;
+terminal String ID;
+terminal Integer NUMBER;
+
+non terminal states,transitions,acti,idList,inputsAll,clickableAll;
+non terminal BinaryOperation exp;
+non terminal Guard guard;
+non terminal State source;
+non terminal State dest;
+non terminal State state;
+non terminal StateChart system;
+non terminal Transition transition;
+non terminal String trigger;
+
+system ::= SYSTEM COLON ID LBRACE states transitions RBRACE  {: 
+				 System.out.println("Parser: Stage 1 of Cup.");
+				 StateChart sc=new StateChart(Collection.getStateList(),Collection.getTransitionList());
+				 System.out.println("Parser: Statechart successfully created."); 
+				 System.out.println("Here Statechart says:\n\tNumber of States = "+sc.getNumberOfStates()+"\n\tNo of Transitions = "+sc.getNumberOfTransitions());
+				 System.out.print("States are as follows:\n\t");
+				 for(State state: sc.getStateSet()){
+					System.out.print(state.getName()+",");
+				 }
+				 System.out.print("\n\nTransitions are as follows:\n\t");	 													 
+				 for(Transition transition : sc.getTransitionSet()){
+					System.out.print(transition.getName()+",");
+				 } 
+				 System.out.println("\nEntering Front End Path Generation");
+				 sc.setStartState(Collection.getStateByName("s1"));				 
+				 FrontEnd fe = new FrontEnd();
+				 System.out.println(fe.dfs(sc,sc.getStartState()));
+				 //fe.dfs(sc.getGraph(), sc.getStartState().getNode());
+				 :};
+
+states ::= states state:sta {:
+									 System.out.println("Parser: Stage 2.1 of Cup.");
+									 Collection.addState(sta.getNode().getNodeId(), sta);
+									 System.out.println("Parser: State "+sta.getName()+" added to Collection"); 
+									 :}
+									  | ;
+state ::= STATE COLON ID:id1 LBRACE DESC COLON ID:id2 inputsAll clickableAll RBRACE {: 
+								System.out.println("Parser: Stage 3.1 of Cup.");
+								//System.out.println("Parser: Values of state"+ Collection.getInputList()+" "+Collection.getClickableList());
+								RESULT=new State(id1,id2,Collection.getInputList(),Collection.getClickableList());
+								System.out.println("Parser: State "+id1+" Identified"); 
+								:} ;
+inputsAll ::= INPUT COLON idList {:
+									System.out.println("Parser: Stage 4.1 of Cup.");
+									Collection.addInputListFromIdList();
+									System.out.println("Parser: InputList Identified");
+								:};
+clickableAll ::= CLICKABLE COLON idList {:
+									System.out.println("Parser: Stage 4.2 of Cup.");
+									Collection.addClickableListFromIdList();
+									System.out.println("Parser: ClickableList Identified");
+								:};
+idList ::= idList COMMA ID:id1 {:
+									System.out.println("Parser: Stage 5 of Cup.");
+									Collection.addId(id1);
+									System.out.println("Parser: Id "+id1+" identified in a State and added");
+										:}
+								| ID:id2 {:
+									System.out.println("Parser: Stage 5 of Cup.");
+									Collection.addId(id2);
+									System.out.println("Parser: Id "+id2+" identified in a State and added");
+									:};
+
+transitions ::= transitions transition:t {:
+									 System.out.println("Parser: Stage 2 of Cup.");
+									 Collection.addTransition(t.getEdge().getEdgeId(), t);
+									 System.out.println("Parser: Transition "+t.getName()+" added to Collection"); 
+									 :}
+									  | ;
+
+transition ::= TRANSITION COLON ID:name LBRACE source:src dest:des trigger:trig guard:grd acti:act RBRACE {: 	
+					System.out.print("Parser: Stage 3 of Cup.");
+					System.out.println(" A Transition "+name+" Identified");
+					Transition transition=new Transition(name,"Desc1",src,des,trig,null,null);
+					RESULT = transition;
+					System.out.println("Parser: Transition "+transition.getName()+" Made"); 
+		 :};
+
+source ::= SOURCE COLON ID:id {: 
+					System.out.println("Parser: Stage 4.1 of Cup.");
+					State state =Collection.getStateByName(id);
+					RESULT = state;
+					System.out.println("Parser: Source of a Transition Identified as "+state); 
+					:} ;
+
+dest ::= DEST COLON ID:id {: 
+					System.out.println("Parser: Stage 4.2 of Cup.");
+					RESULT=Collection.getStateByName(id);
+					System.out.println("Parser: Destination of a Transition Identified as "+id); 
+					:} ;
+
+trigger ::= TRIGGER COLON ID:id {: 
+					System.out.println("Parser: Stage 4.3 of Cup.");
+					RESULT=id;
+					System.out.println("Parser: Trigger of a Transition Identified as "+id); 
+					:} ;
+
+guard ::= GUARD COLON exp:expr {: 
+						System.out.println("Parser: Stage 4.4 of Cup.");
+						Guard g1=new Guard(Collection.getOperationList());
+						System.out.println(g1);
+						System.out.println("Parser: Guard of a transition Identified"); 
+						:} 
+						| ;
+
+/*
+
+LogicalExpression -> (LogicalExpression) | LogicalOR
+LogicalOR -> (LogicalOR) | LogicalOR OR LogicalAnd | LogicalAnd
+LogicalAnd -> (LogicalAnd) | LogicalAnd AND LogicalNot | LogicalNot | LogicalUnit
+LogicalNot -> (LogicalNot) | NOT LogicalNot | NOT LogicalUnit
+LogicalUnit -> (LogicalUnit) | RelationalExpression | True | False
+
+RelationalExpression -> (RelationalExpression) | ID:id1 DOT StringOperation(ID:id2)
+RelationalExpression -> (RelationalExpression) | ArithmeticExpression RelationalOperator ArithmeticExpression
+RelationalOperator -> == | != | < | <= | > | >=
+StringOperation -> contains(ID:id) | indexOf(ID:id) | charAt(NUMBER:num) 
+
+ArithmeticExpression -> (ArithmeticExpression) | ArithmeticMultClass 
+ArithmeticMultClass -> (ArithmeticMultClass) | ArithmeticMultClass MultClassOperators ArithmeticPlusClass | ArithmeticPlusClass
+ArithmeticPlusClass -> (ArithmeticPlusClass) | ArithmeticPlusClass PlusClassOperators ArithmeticId | ArithmeticId
+MultClassOperators -> * | / | %
+PlusClassOperators -> + | -
+ArithmeticId -> int(ID:id1) | double(ID:id1)
+
+*/
+
+acti ::= ACTI COLON SAVE ID:id1 openBracket idList closeBracket {: 
+						System.out.println("Parser: Stage 4.5 of Cup.");
+						ActionClass action = new ActionClass(id1,Collection.getIdList());
+						System.out.println("Parser: Keyset is "+ action.store.keySet().toString());
+						System.out.println("Parser: Action of a transition Identified"); 
+						:} 
+						| ;
+
+exp ::= ID:id1 EQUAL ID:id2 {: 
+						System.out.println("Parser: Stage 5.1 of Cup.");
+						Operation bin1=new BinaryOperation(id1,"=",id2);
+						Collection.addOperation(bin1);
+						System.out.println(bin1.toString());
+						System.out.println("Parser: Expression added to Collection"); 
+						:} ;
+
+
